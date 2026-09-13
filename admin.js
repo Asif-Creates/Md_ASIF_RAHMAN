@@ -1,111 +1,39 @@
 const SUPABASE_URL='https://fcuqketnfpvmjcaknasf.supabase.co';
 const SUPABASE_KEY='sb_publishable_yoWJCM6XIpzJgKFu1tQWuQ_9CfxP1hv';
 const ADMIN_EMAIL='asifrahman1324@gmail.com';
-
-const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
-  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}
-});
-
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+const isAdmin=user=>!!user&&user.email?.trim().toLowerCase()===ADMIN_EMAIL;
 
-function isAdmin(user){
-  return !!user && user.email?.trim().toLowerCase()===ADMIN_EMAIL;
-}
-
-async function boot(){
-  const {data:{session},error}=await supabaseClient.auth.getSession();
-  if(error){
-    console.error('Session check failed:',error);
-    return showLogin();
-  }
-  if(isAdmin(session?.user)) return showApp();
-  if(session) await supabaseClient.auth.signOut({scope:'local'});
-  showLogin();
-}
-
-function showLogin(){
-  $('#loginView').classList.remove('hidden');
-  $('#appView').classList.add('hidden');
-}
-
-function showApp(){
-  $('#loginView').classList.add('hidden');
-  $('#appView').classList.remove('hidden');
-  loadAll();
-}
-
-$('#loginForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  const errorEl=$('#loginError');
-  const button=e.submitter||$('#loginForm button[type="submit"]');
-  errorEl.textContent='';
-  button.disabled=true;
-  button.textContent='Signing in...';
-
-  try{
-    const email=$('#email').value.trim().toLowerCase();
-    const password=$('#password').value;
-
-    if(email!==ADMIN_EMAIL){
-      errorEl.textContent='This account is not authorized.';
-      return;
-    }
-
-    const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
-    if(error){
-      console.error('Supabase sign-in failed:',error);
-      errorEl.textContent='Invalid email or password.';
-      return;
-    }
-
-    if(!isAdmin(data.user)){
-      await supabaseClient.auth.signOut({scope:'local'});
-      errorEl.textContent='This account is not authorized.';
-      return;
-    }
-
-    showApp();
-  }catch(err){
-    console.error('Login error:',err);
-    errorEl.textContent='Unable to sign in. Please try again.';
-  }finally{
-    button.disabled=false;
-    button.textContent='Sign in';
-  }
-});
-
-supabaseClient.auth.onAuthStateChange((_event,session)=>{
-  if(session?.user){
-    if(isAdmin(session.user)) showApp();
-    else supabaseClient.auth.signOut({scope:'local'});
-  }else{
-    showLogin();
-  }
-});
-
-$('#logout').addEventListener('click',async()=>{
-  await supabaseClient.auth.signOut({scope:'local'});
-  showLogin();
-});
-
+function showLogin(){$('#loginView').classList.remove('hidden');$('#appView').classList.add('hidden');}
+function showApp(){$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');loadAll();}
+async function boot(){const {data:{session},error}=await supabaseClient.auth.getSession();if(error){console.error(error);return showLogin()}if(isAdmin(session?.user))showApp();else{if(session)await supabaseClient.auth.signOut({scope:'local'});showLogin()}}
+$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const errorEl=$('#loginError'),button=e.submitter||$('#loginForm button[type="submit"]');errorEl.textContent='';button.disabled=true;button.textContent='Signing in...';try{const email=$('#email').value.trim().toLowerCase(),password=$('#password').value;if(email!==ADMIN_EMAIL){errorEl.textContent='This account is not authorized.';return}const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});if(error){errorEl.textContent='Invalid email or password.';return}if(!isAdmin(data.user)){await supabaseClient.auth.signOut({scope:'local'});errorEl.textContent='This account is not authorized.';return}showApp()}catch(err){console.error(err);errorEl.textContent='Unable to sign in. Please try again.'}finally{button.disabled=false;button.textContent='Sign in'}});
+supabaseClient.auth.onAuthStateChange((_event,session)=>{if(session?.user){if(isAdmin(session.user))showApp();else supabaseClient.auth.signOut({scope:'local'})}else showLogin()});
+$('#logout').addEventListener('click',async()=>{await supabaseClient.auth.signOut({scope:'local'});showLogin()});
 document.querySelectorAll('.side-link').forEach(b=>b.addEventListener('click',()=>showSection(b.dataset.section)));
 function showSection(id){document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('.side-link').forEach(b=>b.classList.toggle('active',b.dataset.section===id));$('#pageTitle').textContent={dashboard:'Dashboard',service:'Service',orders:'Order',intro:'Intro',blog:'Blog',project:'Project'}[id]}
 async function loadAll(){await Promise.all([loadServices(),loadOrders(),loadIntro(),loadBlogs(),loadProjects()])}
-async function loadServices(){const {data,error}=await supabaseClient.from('services').select('*').order('created_at');if(error)return console.error(error);$('#statServices').textContent=data.length;$('#servicesList').innerHTML=data.length?data.map(x=>`<div class="item"><div><h3>${esc(x.name)}</h3><p>${esc(x.price)} · ${esc(x.description)}</p></div><div class="actions"><button class="small-btn" onclick="editService('${x.id}')">Edit</button><button class="small-btn danger" onclick="deleteRow('services','${x.id}')">Delete</button></div></div>`).join(''):'<div class="empty">No services yet.</div>'}
-async function editService(id){const {data}=await supabaseClient.from('services').select('*').eq('id',id).single();if(!data)return;const name=prompt('Service name',data.name);if(name===null)return;const price=prompt('Price',data.price);if(price===null)return;const description=prompt('Description',data.description||'');if(description===null)return;await supabaseClient.from('services').update({name,price,description}).eq('id',id);loadServices()}
-$('#addService').addEventListener('click',async()=>{const name=prompt('Service name');if(!name)return;const price=prompt('Price');if(price===null)return;const description=prompt('Description')||'';await supabaseClient.from('services').insert({name,price,description});loadServices()});
-async function loadOrders(){const {data,error}=await supabaseClient.from('orders').select('*').order('created_at',{ascending:false});if(error){console.error(error);return}$('#statOrders').textContent=data.length;$('#ordersList').innerHTML=data.length?`<table class="orders-table"><thead><tr><th>Customer</th><th>Service</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead><tbody>${data.map(x=>`<tr><td>${esc(x.customer_name)}</td><td>${esc(x.service)}</td><td>${esc(x.phone)}</td><td>${esc(x.status)}</td><td><button class="small-btn" onclick="cycleOrder('${x.id}','${esc(x.status)}')">Update</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">No orders yet.</div>'}
-async function cycleOrder(id,status){const states=['Pending','Confirmed','Completed','Cancelled'];const next=states[(states.indexOf(status)+1)%states.length];await supabaseClient.from('orders').update({status:next}).eq('id',id);loadOrders()}
-async function loadIntro(){const {data,error}=await supabaseClient.from('intro_cards').select('*').order('id');if(error)return console.error(error);$('#introForm').innerHTML=data.map(x=>`<div class="form-block"><h3>${esc(x.section_key.toUpperCase())}</h3><label>Title<input data-id="${x.id}" data-field="title" value="${esc(x.title)}"></label><label>Description<textarea rows="4" data-id="${x.id}" data-field="description">${esc(x.description)}</textarea></label></div>`).join('')}
-$('#saveIntro').addEventListener('click',async()=>{for(const el of document.querySelectorAll('#introForm [data-id]')){const id=el.dataset.id;const field=el.dataset.field;await supabaseClient.from('intro_cards').update({[field]:el.value,updated_at:new Date().toISOString()}).eq('id',id)};alert('Intro cards saved.');loadIntro()});
-async function loadBlogs(){const {data,error}=await supabaseClient.from('blog_posts').select('*').order('created_at',{ascending:false});if(error)return console.error(error);$('#statBlogs').textContent=data.length;$('#blogsList').innerHTML=data.length?data.map(x=>`<div class="item"><div><h3>${esc(x.title)}</h3><p>${esc(x.description)} · ${x.published?'Published':'Draft'}</p></div><div class="actions"><button class="small-btn" onclick="editBlog('${x.id}')">Edit</button><button class="small-btn" onclick="togglePublish('blog_posts','${x.id}',${x.published})">${x.published?'Unpublish':'Publish'}</button><button class="small-btn danger" onclick="deleteRow('blog_posts','${x.id}')">Delete</button></div></div>`).join(''):'<div class="empty">No blog posts yet.</div>'}
-async function editBlog(id){const {data}=await supabaseClient.from('blog_posts').select('*').eq('id',id).single();if(!data)return;const title=prompt('Title',data.title);if(title===null)return;const description=prompt('Short description',data.description||'');if(description===null)return;const content=prompt('Content',data.content||'');if(content===null)return;await supabaseClient.from('blog_posts').update({title,description,content}).eq('id',id);loadBlogs()}
-$('#addBlog').addEventListener('click',async()=>{const title=prompt('Title');if(!title)return;const description=prompt('Short description')||'';const content=prompt('Content')||'';await supabaseClient.from('blog_posts').insert({title,description,content,published:false});loadBlogs()});
-async function loadProjects(){const {data,error}=await supabaseClient.from('projects').select('*').order('created_at',{ascending:false});if(error)return console.error(error);$('#statProjects').textContent=data.length;$('#projectsList').innerHTML=data.length?data.map(x=>`<div class="item"><div><h3>${esc(x.title)}</h3><p>${esc(x.description)} · ${x.published?'Published':'Draft'}</p></div><div class="actions"><button class="small-btn" onclick="editProject('${x.id}')">Edit</button><button class="small-btn" onclick="togglePublish('projects','${x.id}',${x.published})">${x.published?'Unpublish':'Publish'}</button><button class="small-btn danger" onclick="deleteRow('projects','${x.id}')">Delete</button></div></div>`).join(''):'<div class="empty">No projects yet.</div>'}
-async function editProject(id){const {data}=await supabaseClient.from('projects').select('*').eq('id',id).single();if(!data)return;const title=prompt('Title',data.title);if(title===null)return;const description=prompt('Description',data.description||'');if(description===null)return;const content=prompt('Project details',data.content||'');if(content===null)return;await supabaseClient.from('projects').update({title,description,content}).eq('id',id);loadProjects()}
-$('#addProject').addEventListener('click',async()=>{const title=prompt('Project title');if(!title)return;const description=prompt('Description')||'';const content=prompt('Project details')||'';await supabaseClient.from('projects').insert({title,description,content,published:false});loadProjects()});
-async function togglePublish(table,id,value){await supabaseClient.from(table).update({published:!value}).eq('id',id);table==='blog_posts'?loadBlogs():loadProjects()}
-async function deleteRow(table,id){if(!confirm('Delete this item?'))return;await supabaseClient.from(table).delete().eq('id',id);if(table==='services')loadServices();if(table==='blog_posts')loadBlogs();if(table==='projects')loadProjects()}
+function openModal({title,eyebrow='CONTENT',submitText='Save changes',fields, onSubmit}){const old=$('#editorModal');if(old)old.remove();const modal=document.createElement('div');modal.id='editorModal';modal.className='modal-backdrop';modal.innerHTML=`<div class="editor-modal" role="dialog" aria-modal="true" aria-labelledby="editor-title"><button class="modal-close" type="button" aria-label="Close">×</button><div class="modal-eyebrow">${esc(eyebrow)}</div><h2 id="editor-title">${esc(title)}</h2><p class="modal-subtitle">Make your changes below and save when you're ready.</p><form id="editorForm" class="editor-form">${fields.map(f=>`<label>${esc(f.label)}${f.type==='textarea'?`<textarea name="${esc(f.name)}" rows="${f.rows||7}" placeholder="${esc(f.placeholder||'')}">${esc(f.value||'')}</textarea>`:`<input name="${esc(f.name)}" type="${f.type||'text'}" value="${esc(f.value||'')}" placeholder="${esc(f.placeholder||'')}" ${f.required===false?'':'required'}>`}</label>`).join('')}<div class="modal-actions"><button class="modal-cancel" type="button">Cancel</button><button class="primary modal-save" type="submit">${esc(submitText)}</button></div></form></div>`;document.body.appendChild(modal);const close=()=>modal.remove();modal.querySelector('.modal-close').onclick=close;modal.querySelector('.modal-cancel').onclick=close;modal.addEventListener('mousedown',e=>{if(e.target===modal)close()});modal.querySelector('form').addEventListener('submit',async e=>{e.preventDefault();const save=modal.querySelector('.modal-save');save.disabled=true;save.textContent='Saving...';try{const values=Object.fromEntries(new FormData(e.currentTarget).entries());await onSubmit(values);close()}catch(err){console.error(err);alert('Could not save changes. Please try again.')}finally{save.disabled=false;save.textContent=submitText}});setTimeout(()=>modal.querySelector('input,textarea')?.focus(),40)}
 
+async function loadServices(){const {data,error}=await supabaseClient.from('services').select('*').order('created_at');if(error)return console.error(error);$('#statServices').textContent=data.length;$('#servicesList').innerHTML=data.length?data.map(x=>`<div class="item"><div class="item-copy"><h3>${esc(x.name)}</h3><p>${esc(x.price)} · ${esc(x.description)}</p></div><div class="actions"><button class="small-btn" onclick="editService('${x.id}')">Edit</button><button class="small-btn danger" onclick="deleteRow('services','${x.id}')">Delete</button></div></div>`).join(''):'<div class="empty">No services yet.</div>'}
+function editService(id){supabaseClient.from('services').select('*').eq('id',id).single().then(({data,error})=>{if(error||!data)return openModal({title:'Service not found',fields:[],onSubmit:async()=>{}});openModal({title:'Edit service',eyebrow:'SERVICE',fields:[{name:'name',label:'Service name',value:data.name},{name:'price',label:'Price',value:data.price,placeholder:'e.g. ৳7,500'},{name:'description',label:'Description',value:data.description,placeholder:'Short description',type:'textarea',rows:5}],onSubmit:async v=>{const {error:e}=await supabaseClient.from('services').update({name:v.name,price:v.price,description:v.description}).eq('id',id);if(e)throw e;await loadServices()}})})}
+$('#addService').addEventListener('click',()=>openModal({title:'Add service',eyebrow:'NEW SERVICE',submitText:'Create service',fields:[{name:'name',label:'Service name',placeholder:'e.g. Growth Strategy'},{name:'price',label:'Price',placeholder:'e.g. ৳15,000'},{name:'description',label:'Description',placeholder:'What does this service include?',type:'textarea',rows:5}],onSubmit:async v=>{const {error}=await supabaseClient.from('services').insert({name:v.name,price:v.price,description:v.description});if(error)throw error;await loadServices()}}));
+
+async function loadOrders(){const {data,error}=await supabaseClient.from('orders').select('*').order('created_at',{ascending:false});if(error){console.error(error);return}$('#statOrders').textContent=data.length;$('#ordersList').innerHTML=data.length?`<table class="orders-table"><thead><tr><th>Customer</th><th>Service</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead><tbody>${data.map(x=>`<tr><td>${esc(x.customer_name)}</td><td>${esc(x.service)}</td><td>${esc(x.phone)}</td><td><span class="status-pill">${esc(x.status)}</span></td><td><button class="small-btn" onclick="cycleOrder('${x.id}','${esc(x.status)}')">Update</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">No orders yet.</div>'}
+async function cycleOrder(id,status){const states=['Pending','Confirmed','Completed','Cancelled'],next=states[(states.indexOf(status)+1)%states.length];const {error}=await supabaseClient.from('orders').update({status:next}).eq('id',id);if(error)return console.error(error);loadOrders()}
+
+async function loadIntro(){const {data,error}=await supabaseClient.from('intro_cards').select('*').order('id');if(error)return console.error(error);$('#introForm').innerHTML=data.map(x=>`<div class="form-block"><div><span class="form-key">${esc(x.section_key.toUpperCase())}</span><h3>${esc(x.title)}</h3><p>${esc(x.description)}</p></div><button class="small-btn" onclick="editIntro(${x.id})">Edit</button></div>`).join('')}
+function editIntro(id){supabaseClient.from('intro_cards').select('*').eq('id',id).single().then(({data,error})=>{if(error||!data)return;openModal({title:`Edit ${data.section_key}`,eyebrow:'HOMEPAGE INTRO',fields:[{name:'title',label:'Title',value:data.title},{name:'description',label:'Description',value:data.description,type:'textarea',rows:7}],onSubmit:async v=>{const {error:e}=await supabaseClient.from('intro_cards').update({title:v.title,description:v.description,updated_at:new Date().toISOString()}).eq('id',id);if(e)throw e;await loadIntro()}})})}
+
+async function loadBlogs(){const {data,error}=await supabaseClient.from('blog_posts').select('*').order('created_at',{ascending:false});if(error)return console.error(error);$('#statBlogs').textContent=data.length;$('#blogsList').innerHTML=data.length?data.map(x=>`<div class="item"><div class="item-copy"><h3>${esc(x.title)}</h3><p>${esc(x.description)} · <span class="publish-state ${x.published?'is-published':''}">${x.published?'Published':'Draft'}</span></p></div><div class="actions"><button class="small-btn" onclick="editBlog('${x.id}')">Edit</button><button class="small-btn" onclick="togglePublish('blog_posts','${x.id}',${x.published})">${x.published?'Unpublish':'Publish'}</button><button class="small-btn danger" onclick="deleteRow('blog_posts','${x.id}')">Delete</button></div></div>`).join(''):'<div class="empty">No blog posts yet.</div>'}
+function editBlog(id){supabaseClient.from('blog_posts').select('*').eq('id',id).single().then(({data,error})=>{if(error||!data)return;openModal({title:'Edit blog post',eyebrow:'BLOG CONTENT',fields:[{name:'title',label:'Title',value:data.title},{name:'description',label:'Short description',value:data.description},{name:'content',label:'Article content',value:data.content,type:'textarea',rows:12}],onSubmit:async v=>{const {error:e}=await supabaseClient.from('blog_posts').update({title:v.title,description:v.description,content:v.content}).eq('id',id);if(e)throw e;await loadBlogs()}})})}
+$('#addBlog').addEventListener('click',()=>openModal({title:'Create blog post',eyebrow:'NEW BLOG POST',submitText:'Create post',fields:[{name:'title',label:'Title',placeholder:'Write a clear article title'},{name:'description',label:'Short description',placeholder:'One or two sentences'},{name:'content',label:'Article content',placeholder:'Write your full article here...',type:'textarea',rows:14}],onSubmit:async v=>{const {error}=await supabaseClient.from('blog_posts').insert({title:v.title,description:v.description,content:v.content,published:false});if(error)throw error;await loadBlogs()}}));
+
+async function loadProjects(){const {data,error}=await supabaseClient.from('projects').select('*').order('created_at',{ascending:false});if(error)return console.error(error);$('#statProjects').textContent=data.length;$('#projectsList').innerHTML=data.length?data.map(x=>`<div class="item"><div class="item-copy"><h3>${esc(x.title)}</h3><p>${esc(x.description)} · <span class="publish-state ${x.published?'is-published':''}">${x.published?'Published':'Draft'}</span></p></div><div class="actions"><button class="small-btn" onclick="editProject('${x.id}')">Edit</button><button class="small-btn" onclick="togglePublish('projects','${x.id}',${x.published})">${x.published?'Unpublish':'Publish'}</button><button class="small-btn danger" onclick="deleteRow('projects','${x.id}')">Delete</button></div></div>`).join(''):'<div class="empty">No projects yet.</div>'}
+function editProject(id){supabaseClient.from('projects').select('*').eq('id',id).single().then(({data,error})=>{if(error||!data)return;openModal({title:'Edit project',eyebrow:'PROJECT DETAILS',fields:[{name:'title',label:'Project title',value:data.title},{name:'description',label:'Short description',value:data.description},{name:'content',label:'Project details',value:data.content,type:'textarea',rows:12}],onSubmit:async v=>{const {error:e}=await supabaseClient.from('projects').update({title:v.title,description:v.description,content:v.content}).eq('id',id);if(e)throw e;await loadProjects()}})})}
+$('#addProject').addEventListener('click',()=>openModal({title:'Create project',eyebrow:'NEW PROJECT',submitText:'Create project',fields:[{name:'title',label:'Project title',placeholder:'e.g. Vangari'},{name:'description',label:'Short description',placeholder:'What is this project about?'},{name:'content',label:'Project details',placeholder:'Full project overview...',type:'textarea',rows:14}],onSubmit:async v=>{const {error}=await supabaseClient.from('projects').insert({title:v.title,description:v.description,content:v.content,published:false});if(error)throw error;await loadProjects()}}));
+async function togglePublish(table,id,value){const {error}=await supabaseClient.from(table).update({published:!value}).eq('id',id);if(error)return console.error(error);table==='blog_posts'?loadBlogs():loadProjects()}
+async function deleteRow(table,id){if(!confirm('Delete this item?'))return;const {error}=await supabaseClient.from(table).delete().eq('id',id);if(error){console.error(error);alert('Could not delete this item.');return}if(table==='services')loadServices();if(table==='blog_posts')loadBlogs();if(table==='projects')loadProjects()}
 boot();
