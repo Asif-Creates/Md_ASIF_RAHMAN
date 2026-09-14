@@ -1,5 +1,4 @@
 (function(){
-const originalOpenModal=window.openModal;
 let categories=[];
 const $=s=>document.querySelector(s);
 const escCat=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
@@ -14,13 +13,17 @@ function addCategoryNavigation(){
   const section=document.createElement('section');section.id='category';section.className='panel';
   section.innerHTML='<div class="card"><div class="section-head"><div><p class="eyebrow">BLOG CONTENT</p><h2>Categories</h2></div><button class="primary" id="addCategory">+ Add category</button></div><div id="categoriesList" class="list"></div></div>';
   const project=document.getElementById('project');main.insertBefore(section,project||null);
-  document.getElementById('addCategory').addEventListener('click',addCategory);
+ }
+ const addBtn=$('#addCategory');
+ if(addBtn&&!addBtn.dataset.categoryHandler){
+  addBtn.dataset.categoryHandler='true';
+  addBtn.addEventListener('click',addCategory);
  }
 }
 
 async function loadCategories(){
  const {data,error}=await supabaseClient.from('blog_categories').select('id,name,created_at').order('created_at',{ascending:true});
- if(error){console.error(error);return []}
+ if(error){console.error('Could not load categories:',error);return []}
  categories=data||[];
  const list=$('#categoriesList');
  if(list)list.innerHTML=categories.length?categories.map(c=>`<div class="item"><div class="item-copy"><h3>${escCat(c.name)}</h3><p>Available for blog posts</p></div><div class="actions"><button class="small-btn danger" onclick="deleteCategory('${c.id}','${escCat(c.name)}')">Delete</button></div></div>`).join(''):'<div class="empty">No categories yet.</div>';
@@ -39,13 +42,12 @@ async function addCategory(){
 window.deleteCategory=async function(id,name){
  if(!confirm(`Delete category “${name}”?`))return;
  const {error}=await supabaseClient.from('blog_categories').delete().eq('id',id);
- if(error){alert('This category cannot be deleted while it is used by a blog post.');return}
+ if(error){alert('This category cannot be deleted while it is used by a blog post.');console.error(error);return}
  await loadCategories();await refreshCategoryAwareUI();
 };
 
 async function refreshCategoryAwareUI(){
- const {data,error}=await supabaseClient.from('blog_posts').select('*').order('created_at',{ascending:false});
- if(!error&&typeof window.loadBlogs==='function')window.loadBlogs();
+ if(typeof window.loadBlogs==='function')await window.loadBlogs();
 }
 
 window.openModal=function(opts){
