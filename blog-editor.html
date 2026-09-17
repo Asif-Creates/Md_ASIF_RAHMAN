@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blog Editor | Md Asif Rahman</title>
+<link rel="stylesheet" href="blog-editor.css">
+</head>
+<body>
+<div class="editor-shell">
+<header class="editor-topbar"><div><span class="eyebrow">CONTENT STUDIO</span><h1>Blog Editor</h1></div><div class="top-actions"><button id="backBtn" class="ghost">← Back</button><button id="previewBtn" class="ghost">Preview</button><button id="saveBtn" class="primary">Save draft</button></div></header>
+<main class="workspace">
+<section class="canvas-column">
+<div class="card intro-card"><input id="title" class="main-title" placeholder="Write your article title..." maxlength="180"><textarea id="description" class="lead-input" placeholder="Short description / excerpt..."></textarea><div class="meta-row"><input id="category" placeholder="Category"><input id="slug" placeholder="URL slug"><label class="switch"><input id="published" type="checkbox"><span></span> Published</label></div></div>
+<div id="blocks" class="blocks"></div>
+<div class="add-block"><button data-type="h1">+ H1</button><button data-type="h2">+ H2</button><button data-type="h3">+ H3</button><button data-type="paragraph">+ Paragraph</button><button data-type="image">+ Image</button><button data-type="imageText">+ Image + Text</button><button data-type="quote">+ Quote</button><button data-type="list">+ List</button><button data-type="divider">+ Divider</button></div>
+</section>
+<aside class="sidebar">
+<div class="card"><div class="card-title"><span>SEO</span><small>SEARCH OPTIMIZATION</small></div><label>Meta title<input id="metaTitle" maxlength="60" placeholder="Ideal: 50–60 characters"></label><div class="counter" id="metaTitleCount">0 / 60</div><label>Meta description<textarea id="metaDescription" maxlength="160" rows="4" placeholder="Ideal: 140–160 characters"></textarea></label><div class="counter" id="metaDescriptionCount">0 / 160</div><label>Focus keyword<input id="focusKeyword" placeholder="Primary search phrase"></label><label>Canonical URL<input id="canonicalUrl" placeholder="https://mdasifrahman.com/blog/... "></label></div>
+<div class="card"><div class="card-title"><span>FEATURED IMAGE</span><small>OPEN GRAPH</small></div><label>Image URL<input id="coverImage" placeholder="https://..."></label><label>Alt text<input id="imageAlt" placeholder="Describe the image naturally"></label><label>Social / OG image URL<input id="ogImage" placeholder="Optional — defaults to featured image"></label><div id="imagePreview" class="image-preview">No image selected</div></div>
+<div class="card"><div class="card-title"><span>ARTICLE CHECK</span><small>QUALITY</small></div><ul id="checks" class="checks"></ul></div>
+</aside>
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="blog-editor.js"></script>
+</body>
+</html>
